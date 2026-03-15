@@ -33,10 +33,9 @@ class BaseDRDataset(Dataset):
         # Load image via PIL
         try:
             image = Image.open(img_path).convert('RGB')
-        except Exception as e:
-            print(f"Error loading image {img_path}: {e}")
-            # Return a blank image or handle the error appropriately in custom cases
-            raise e
+        except Exception:
+            print(f"Skipping corrupted image: {img_path}")
+            return self.__getitem__((idx + 1) % len(self.images))
             
         if self.transform is not None:
             image = self.transform(image)
@@ -60,9 +59,13 @@ class APTOSDataset(BaseDRDataset):
         df = pd.read_csv(csv_path)
         for _, row in df.iterrows():
             img_path = os.path.join(img_folder, f"{row['id_code']}.png")
-            self.images.append(img_path)
-            # APTOS labels are already 0-4
-            self.labels.append(int(row['diagnosis']))
+            label = int(row['diagnosis'])
+            if os.path.exists(img_path):
+                self.images.append(img_path)
+                # APTOS labels are already 0-4
+                self.labels.append(int(label))
+            else:
+                print(f"Warning: image not found {img_path}")
 
 
 class MessidorDataset(BaseDRDataset):
@@ -80,13 +83,12 @@ class MessidorDataset(BaseDRDataset):
             
         df = pd.read_csv(csv_path)
         for _, row in df.iterrows():
-            img_path = os.path.join(img_folder, str(row['image_id']))
+            img_path = os.path.join(img_folder, str(row['id_code']))
             if not img_path.endswith('.jpg') and not img_path.endswith('.png'):
                 img_path += '.jpg' # Assume jpg if extension missing
                 
-            self.images.append(img_path)
             # Standardize Messidor (0-3 scale typically, map to 0-4 if needed or keep as is, assuming 0-3 maps suitably or is provided standard)
-            label = int(row['retinopathy_grade'])
+            label = int(row['diagnosis'])
             # Example mapping if Messidor is 0-3:
             # 0: No DR, 1: Mild, 2: Moderate/Severe, 3: Proliferative.
             # You might need to adjust mapping based on exact data format used.
@@ -95,7 +97,11 @@ class MessidorDataset(BaseDRDataset):
             elif label == 2:
                 label = 2 # Moderate
                 
-            self.labels.append(label)
+            if os.path.exists(img_path):
+                self.images.append(img_path)
+                self.labels.append(int(label))
+            else:
+                print(f"Warning: image not found {img_path}")
 
 class ODIRDataset(BaseDRDataset):
     """
@@ -137,7 +143,10 @@ class ODIRDataset(BaseDRDataset):
             
             # We add left eye if it's DR labeled or Normal
             if label > 0 or 'normal fundus' in diagnosis:
-                self.images.append(img_path)
-                self.labels.append(label)
+                if os.path.exists(img_path):
+                    self.images.append(img_path)
+                    self.labels.append(int(label))
+                else:
+                    print(f"Warning: image not found {img_path}")
                 
             # Could repeat for Right Eye (row['Right-Fundus']) appropriately.

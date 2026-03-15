@@ -1,7 +1,9 @@
 import yaml
 import os
 
-def load_config(config_path="config.yaml"):
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+def load_config(config_path=None):
     """
     Loads the YAML configuration file.
     
@@ -11,6 +13,9 @@ def load_config(config_path="config.yaml"):
     Returns:
         dict: Configuration dictionary.
     """
+    if config_path is None:
+        config_path = os.path.join(PROJECT_ROOT, "config.yaml")
+        
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Config file not found at {config_path}")
         
@@ -19,7 +24,7 @@ def load_config(config_path="config.yaml"):
         
     return config
 
-def get_experiment_config(experiment_name, base_config_path="config.yaml"):
+def get_experiment_config(experiment_name, base_config_path=None):
     """
     Utility to potentially merge experiment specific overrides.
     """

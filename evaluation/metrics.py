@@ -57,9 +57,8 @@ def plot_confusion_matrix(y_true, y_pred, class_names, save_path=None):
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, bbox_inches='tight')
-        plt.close()
-    else:
-        plt.show()
+    
+    plt.show()
 
 def save_metrics(metrics, save_path):
     """

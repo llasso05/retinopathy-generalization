@@ -1,13 +1,32 @@
+# Datasets
+datasets/
 data/
-results/
-models/
-*.pt
-*.pth
-*.h5
-*.ckpt
-*.csv
-*.ipynb_checkpoints
+*.jpg
+*.jpeg
+*.png
+*.tif
+*.tiff
 
+# Model outputs
+results/
+checkpoints/
+gradcam/
+
+# Python
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env/
+
+# Mac files
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log

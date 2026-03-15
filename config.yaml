@@ -1,7 +1,7 @@
 dataset_paths:
-  aptos: "data/aptos"
-  messidor: "data/messidor"
-  odir: "data/odir"
+  aptos: "datasets/aptos"
+  messidor: "datasets/messidor"
+  odir: "datasets/odir"
 
 output_dir: "results"
 checkpoint_dir: "results/checkpoints"
