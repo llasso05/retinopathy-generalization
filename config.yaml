@@ -1,0 +1,25 @@
+dataset_paths:
+  aptos: "data/aptos"
+  messidor: "data/messidor"
+  odir: "data/odir"
+
+output_dir: "results"
+checkpoint_dir: "results/checkpoints"
+gradcam_dir: "results/gradcam"
+
+training:
+  batch_size: 32
+  num_workers: 4
+  learning_rate: 0.001
+  num_epochs: 50
+  patience: 10 # For early stopping
+  
+model:
+  type: "resnet50" # 'simple_cnn' or 'resnet50'
+  num_classes: 5
+  pretrained: true
+  
+preprocessing:
+  image_size: 224
+  normalize_mean: [0.485, 0.456, 0.406] # ImageNet defaults
+  normalize_std: [0.229, 0.224, 0.225]
