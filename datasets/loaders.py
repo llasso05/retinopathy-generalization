@@ -45,12 +45,16 @@ class BaseDRDataset(Dataset):
 class APTOSDataset(BaseDRDataset):
     """
     Loader for the APTOS 2019 Blindness Detection dataset.
-    Expecting a 'train.csv' file with 'id_code' and 'diagnosis' columns.
-    Images should be in an 'images' subfolder or similar.
+    Standardized to handle both train and test sets by allowing custom filenames.
     """
+    def __init__(self, data_dir, transform=None, csv_name='train.csv', img_folder='train_images'):
+        self.csv_name = csv_name
+        self.img_folder_name = img_folder
+        super().__init__(data_dir, transform)
+
     def _load_data(self):
-        csv_path = os.path.join(self.data_dir, 'train.csv')
-        img_folder = os.path.join(self.data_dir, 'train_images')
+        csv_path = os.path.join(self.data_dir, self.csv_name)
+        img_folder = os.path.join(self.data_dir, self.img_folder_name)
         
         if not os.path.exists(csv_path):
             print(f"Warning: CSV not found at {csv_path}. Using empty dataset.")
@@ -59,10 +63,11 @@ class APTOSDataset(BaseDRDataset):
         df = pd.read_csv(csv_path)
         for _, row in df.iterrows():
             img_path = os.path.join(img_folder, f"{row['id_code']}.png")
-            label = int(row['diagnosis'])
+            
             if os.path.exists(img_path):
                 self.images.append(img_path)
-                # APTOS labels are already 0-4
+                # Handle cases where diagnosis might be missing (though here it exists)
+                label = row.get('diagnosis', -1) 
                 self.labels.append(int(label))
             else:
                 print(f"Warning: image not found {img_path}")
