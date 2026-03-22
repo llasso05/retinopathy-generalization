@@ -45,11 +45,11 @@ class BaseDRDataset(Dataset):
 class APTOSDataset(BaseDRDataset):
     """
     Loader for the APTOS 2019 Blindness Detection dataset.
-    Standardized to handle both train and test sets by allowing custom filenames.
     """
-    def __init__(self, data_dir, transform=None, csv_name='train.csv', img_folder='train_images'):
-        self.csv_name = csv_name
-        self.img_folder_name = img_folder
+    def __init__(self, data_dir, transform=None, split='train'):
+        self.split = split
+        self.csv_name = f"{split}.csv"
+        self.img_folder_name = f"{split}_images"
         super().__init__(data_dir, transform)
 
     def _load_data(self):
@@ -66,21 +66,25 @@ class APTOSDataset(BaseDRDataset):
             
             if os.path.exists(img_path):
                 self.images.append(img_path)
-                # Handle cases where diagnosis might be missing (though here it exists)
                 label = row.get('diagnosis', -1) 
                 self.labels.append(int(label))
             else:
-                print(f"Warning: image not found {img_path}")
-
+                # print(f"Warning: image not found {img_path}")
+                pass
 
 class MessidorDataset(BaseDRDataset):
     """
     Loader for Messidor dataset.
-    Assuming a generalized CSV format with 'image_id' and 'retinopathy_grade'.
     """
+    def __init__(self, data_dir, transform=None, split='train'):
+        self.split = split
+        self.csv_name = f"{split}.csv"
+        self.img_folder_name = split
+        super().__init__(data_dir, transform)
+
     def _load_data(self):
-        csv_path = os.path.join(self.data_dir, 'messidor_data.csv')
-        img_folder = os.path.join(self.data_dir, 'images')
+        csv_path = os.path.join(self.data_dir, self.csv_name)
+        img_folder = os.path.join(self.data_dir, self.img_folder_name)
         
         if not os.path.exists(csv_path):
             print(f"Warning: CSV not found at {csv_path}. Using empty dataset.")
@@ -88,70 +92,66 @@ class MessidorDataset(BaseDRDataset):
             
         df = pd.read_csv(csv_path)
         for _, row in df.iterrows():
-            img_path = os.path.join(img_folder, str(row['id_code']))
-            if not img_path.endswith('.jpg') and not img_path.endswith('.png'):
-                img_path += '.jpg' # Assume jpg if extension missing
+            # In the new structure, Image column has the .tif extension
+            img_path = os.path.join(img_folder, str(row['Image']))
                 
-            # Standardize Messidor (0-3 scale typically, map to 0-4 if needed or keep as is, assuming 0-3 maps suitably or is provided standard)
-            label = int(row['diagnosis'])
-            # Example mapping if Messidor is 0-3:
-            # 0: No DR, 1: Mild, 2: Moderate/Severe, 3: Proliferative.
-            # You might need to adjust mapping based on exact data format used.
-            if label == 3: 
-                label = 4 # Map to Proliferative DR
-            elif label == 2:
-                label = 2 # Moderate
+            # Map 'Id' column to labels (0-4)
+            label = int(row.get('Id', -1))
                 
             if os.path.exists(img_path):
                 self.images.append(img_path)
                 self.labels.append(int(label))
             else:
-                print(f"Warning: image not found {img_path}")
+                # print(f"Warning: image not found {img_path}")
+                pass
 
 class ODIRDataset(BaseDRDataset):
     """
-    Loader for the Ocular Disease Intelligent Recognition (ODIR) dataset.
-    Focuses only on the DR labels for this context.
+    Loader for ODIR dataset.
+    Maps keywords to 0-4 DR severity levels.
     """
+    def __init__(self, data_dir, transform=None, split='train'):
+        self.split = split
+        # ODIR seems to have full_df.csv as the main meta file
+        self.csv_name = 'full_df.csv'
+        self.img_folder_name = 'Training Images' if split == 'train' else 'Testing Images'
+        super().__init__(data_dir, transform)
+
+    def _extract_label(self, diagnosis):
+        diagnosis = str(diagnosis).lower()
+        if 'proliferative diabetic retinopathy' in diagnosis:
+            return 4
+        elif 'severe nonproliferative diabetic retinopathy' in diagnosis:
+            return 3
+        elif 'moderate nonproliferative diabetic retinopathy' in diagnosis:
+            return 2
+        elif 'mild nonproliferative diabetic retinopathy' in diagnosis:
+            return 1
+        return 0 # Normal or other disease
+
     def _load_data(self):
-        csv_path = os.path.join(self.data_dir, 'ODIR-5K_Training_Annotations(Updated)_V2.xlsx')
-        img_folder = os.path.join(self.data_dir, 'ODIR-5K_Training_Dataset')
+        csv_path = os.path.join(self.data_dir, self.csv_name)
+        img_folder = os.path.join(self.data_dir, self.img_folder_name)
         
         if not os.path.exists(csv_path):
             print(f"Warning: Annotation file not found at {csv_path}. Using empty dataset.")
             return
             
-        # ODIR is typically an Excel sheet
-        df = pd.read_excel(csv_path)
+        df = pd.read_csv(csv_path)
         for _, row in df.iterrows():
-            img_path = os.path.join(img_folder, str(row['Left-Fundus']))
-            
-            # ODIR has complex labels (N, D, G, C, A, H, M, O). 'D' is Diabetic Retinopathy.
-            # ODIR doesn't strictly have 0-4 severity naturally in the core label, 
-            # it only gives presence/absence of DR ('D' keyword) usually, BUT there are diagnostic keywords.
-            # For this simplified loader, we'll dummy map it.
-            # If cross-dataset evaluation needs 5 classes, you might need severity extraction from keywords.
-            
-            # simplified dummy logic:
-            diagnosis = str(row['Left-Diagnostic Keywords']).lower()
-            label = 0
-            if 'proliferative diabetic retinopathy' in diagnosis:
-                label = 4
-            elif 'severe nonproliferative diabetic retinopathy' in diagnosis:
-                label = 3
-            elif 'moderate nonproliferative diabetic retinopathy' in diagnosis:
-                label = 2
-            elif 'mild nonproliferative diabetic retinopathy' in diagnosis:
-                label = 1
-            elif 'diabetic retinopathy' in diagnosis:
-                label = 2 # Default fallback
-            
-            # We add left eye if it's DR labeled or Normal
-            if label > 0 or 'normal fundus' in diagnosis:
-                if os.path.exists(img_path):
-                    self.images.append(img_path)
-                    self.labels.append(int(label))
-                else:
-                    print(f"Warning: image not found {img_path}")
-                
-            # Could repeat for Right Eye (row['Right-Fundus']) appropriately.
+            # Check Left Eye
+            left_img = os.path.join(img_folder, str(row['Left-Fundus']))
+            if os.path.exists(left_img):
+                label = self._extract_label(row['Left-Diagnostic Keywords'])
+                # Only add if it's DR or explicitly Normal fundus
+                if label > 0 or 'normal fundus' in str(row['Left-Diagnostic Keywords']).lower():
+                    self.images.append(left_img)
+                    self.labels.append(label)
+
+            # Check Right Eye
+            right_img = os.path.join(img_folder, str(row['Right-Fundus']))
+            if os.path.exists(right_img):
+                label = self._extract_label(row['Right-Diagnostic Keywords'])
+                if label > 0 or 'normal fundus' in str(row['Right-Diagnostic Keywords']).lower():
+                    self.images.append(right_img)
+                    self.labels.append(label)

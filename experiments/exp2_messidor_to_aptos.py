@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch import nn, optim
 
+# Adjust import paths depending on how the script is run
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.config import get_experiment_config
@@ -25,9 +26,11 @@ def main():
     val_transform = get_transforms(config, is_training=False)
     
     # Train on Messidor
-    train_dataset = MessidorDataset(config['dataset_paths']['messidor'], transform=train_transform)
-    # Evaluate on APTOS
-    val_dataset = APTOSDataset(config['dataset_paths']['aptos'], transform=val_transform)
+    train_dataset = MessidorDataset(config['dataset_paths']['messidor'], transform=train_transform, split='train')
+    # Evaluate on APTOS (Generalization)
+    val_dataset = APTOSDataset(config['dataset_paths']['aptos'], transform=val_transform, split='test')
+    # Self-Test on Messidor
+    self_test_dataset = MessidorDataset(config['dataset_paths']['messidor'], transform=val_transform, split='test')
     
     if len(train_dataset) == 0 or len(val_dataset) == 0:
         print("Error: Datasets are empty. Please ensure data is placed correctly according to config.yaml")
@@ -37,6 +40,8 @@ def main():
                               shuffle=True, num_workers=config['training']['num_workers'])
     val_loader = DataLoader(val_dataset, batch_size=config['training']['batch_size'], 
                             shuffle=False, num_workers=config['training']['num_workers'])
+    self_test_loader = DataLoader(self_test_dataset, batch_size=config['training']['batch_size'], 
+                                  shuffle=False, num_workers=config['training']['num_workers'])
 
     # ==========================
     # 2. Setup Model & Training
@@ -62,7 +67,19 @@ def main():
     # ==========================
     # 4. Final Evaluation
     # ==========================
-    print("Evaluating on APTOS...")
+    class_names = ['No DR', 'Mild', 'Moderate', 'Severe', 'Proliferative DR']
+
+    # Self-Test on Messidor
+    print("Evaluating on Messidor Test Set (Self-Test)...")
+    self_loss, y_pred_self, y_true_self, y_prob_self = validate(model, self_test_loader, criterion, device)
+    self_metrics = calculate_metrics(y_true_self, y_pred_self, y_prob_self)
+    self_metrics['val_loss'] = self_loss
+    save_metrics(self_metrics, os.path.join(exp_dir, 'self_test_metrics.json'))
+    plot_confusion_matrix(y_true_self, y_pred_self, class_names, 
+                          save_path=os.path.join(exp_dir, 'self_test_confusion_matrix.png'))
+
+    # Generalization on APTOS
+    print("Evaluating on APTOS (Generalization)...")
     val_loss, y_pred, y_true, y_prob = validate(model, val_loader, criterion, device)
     
     metrics = calculate_metrics(y_true, y_pred, y_prob)
@@ -70,12 +87,10 @@ def main():
     
     # Save results
     save_metrics(metrics, os.path.join(exp_dir, 'metrics.json'))
-    
-    class_names = ['No DR', 'Mild', 'Moderate', 'Severe', 'Proliferative DR']
     plot_confusion_matrix(y_true, y_pred, class_names, 
                           save_path=os.path.join(exp_dir, 'confusion_matrix.png'))
                           
-    print(f"Experiment completed. Metrics saved to {exp_dir}")
+    print(f"Experiment completed. Results saved to {exp_dir}")
 
 if __name__ == '__main__':
     main()

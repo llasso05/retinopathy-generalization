@@ -8,10 +8,10 @@ checkpoint_dir: "results/checkpoints"
 gradcam_dir: "results/gradcam"
 
 training:
-  batch_size: 32
-  num_workers: 4
-  learning_rate: 0.001
-  num_epochs: 50
+  batch_size: 64
+  num_workers: 8
+  learning_rate: 0.0001
+  num_epochs: 30
   patience: 10 # For early stopping
   
 model:
